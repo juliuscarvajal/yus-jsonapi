@@ -1,4 +1,4 @@
-###yus-jsonapi
+#yus-jsonapi
 
 A JSON API (jsonapi.org) Implementation that uses Bookshelfjs models.
 
@@ -9,21 +9,21 @@ npm install yus-jsonapi
 
 ## Usage
 
-# ES6
+### ES6
 ```
 import {toJSON} from 'yus-jsonapi';
 import {toJSONAPI} from 'yus-jsonapi';
 import {response} from 'yus-jsonapi';
 ```
 
-# ES5
+### ES5
 ```
 var toJSON = require('yus-jsonapi');
 var toJSONAPI = require('yus-jsonapi');
 var response = require('yus-jsonapi');
 ```
 
-# Use with other middlewares
+### Use with other middlewares
 ```
 app.use(toJSON); // Converts JSONAPI request body to Bookshelfjs model. Generates the req.data (TODO: Convert to Bookshelfjs model)
 
