@@ -4,7 +4,7 @@ A JSON API (jsonapi.org) Implementation that uses Bookshelfjs models.
 
 ## Installation
 ```
-npm install yus-jsonapi
+npm install git://github.com/juliuscarvajal/yus-jsonapi
 ```
 
 ## Usage
