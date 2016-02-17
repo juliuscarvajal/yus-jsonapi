@@ -1,8 +1,8 @@
 /* jshint node: true */
 /* jshint esnext: true */
 
-import _  from 'lodash';
-import {log} from './logger';
+var _ = require('lodash');
+//import {log} from './logger';
 
 /**
  * JSONAPIfy a bookshelf model.
@@ -42,30 +42,30 @@ function toJSONAPI(req, res, next) {
     },
   };
 
-  let resourceId = (model) => {
+  let resourceId = function(model) {
     return model.id ? {
       type: model.constructor.type + 's', //TODO: temporary fix as Kalpana's angular-jsonapi library is not happy with singular types.  https://github.com/jakubrohleder/angular-jsonapi/issues/28
       id: model.id
     } : null;
   };
 
-  let links = (relationshipName) => {
-    return (model) => {
+  let links = function(relationshipName) {
+    return function(model) {
       return {
         self: root + req.baseUrl + '/' + model.constructor.api + '/' + model.id + '/relationships/' + relationshipName,
         related: root + req.baseUrl + '/' + model.constructor.api + '/' + model.id + '/' + relationshipName //TODO: get model from each model.relationship...
       };
     };
-  }
+  };
 
-  let relationships = (includeLinks) => {
-    return (model) => {
+  let relationships = function(includeLinks) {
+    return function(model) {
       let rels = {};
 
       //TODO: Fix missing relation when specifying only one include. Ex. /channels?include=schedules (no screens)
       let relations = req.query.include ? model.relations : model.relationships;
 
-      _.map(relations, (r, k) => {
+      _.map(relations, function(r, k) {
         let related = null;
         if (req.query.include) {
           let relatedModels = r.models || r;
@@ -108,15 +108,15 @@ function toJSONAPI(req, res, next) {
     };
   };
 
-  let attributes = () => {
-    return (model) => {
+  let attributes = function() {
+    return function(model) {
       //return _.omit(model.attributes, 'id');
       return _.omit(model.toJSON({shallow: true}), 'id');
       //return model.toJSON();
     };
   };
 
-  let data = (model, attributes, relationships) => {
+  let data = function(model, attributes, relationships) {
     let topLevel = null;
     if (!model) {
       return topLevel;
@@ -130,7 +130,7 @@ function toJSONAPI(req, res, next) {
     }
 
     topLevel = _.isArray(topLevel) ? topLevel : [topLevel];
-    let jsondata = _.map(topLevel, (v, k) => {
+    let jsondata = _.map(topLevel, function(v, k) {
       let json = null;
 
       let resId = resourceId(v);
@@ -161,7 +161,7 @@ function toJSONAPI(req, res, next) {
     });
 
     return jsondata;
-  }
+  };
 
   let resourceLinkage = data;
   let primaryData = data;
@@ -191,7 +191,7 @@ function toJSONAPI(req, res, next) {
     if (!model)
       return null;
 
-    _.map(model.relations, (r, k) => {
+    _.map(model.relations, function(r, k) {
       //log.debug('model.relations', r);
       let relatedModels = r.models;
 
@@ -200,7 +200,7 @@ function toJSONAPI(req, res, next) {
       }
 
       if (relatedModels) {
-        _.map(relatedModels, rm => {
+        _.map(relatedModels, function(rm) {
           let relatedData = data(rm, attributes(), relationships(false));
           if (relatedData) {
             Array.prototype.push.apply(result[k], relatedData);
@@ -223,7 +223,7 @@ function toJSONAPI(req, res, next) {
         }
       }
     });
-  };
+  }
 
   if (model && model.models) {
     _.map(model.models, m => {
