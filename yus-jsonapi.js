@@ -2,6 +2,7 @@
 /* jshint esnext: true */
 
 import _  from 'lodash';
+import {log} from './logger';
 
 /**
  * JSONAPIfy a bookshelf model.
@@ -43,7 +44,7 @@ function toJSONAPI(req, res, next) {
 
   let resourceId = (model) => {
     return model.id ? {
-      type: model.constructor.type, // + 's', //TODO: temporary fix as Kalpana's angular-jsonapi library is not happy with singular types.  https://github.com/jakubrohleder/angular-jsonapi/issues/28
+      type: model.constructor.type + 's', //TODO: temporary fix as Kalpana's angular-jsonapi library is not happy with singular types.  https://github.com/jakubrohleder/angular-jsonapi/issues/28
       id: model.id
     } : null;
   };
@@ -61,7 +62,7 @@ function toJSONAPI(req, res, next) {
     return (model) => {
       let rels = {};
 
-      //TODO: Fix missing relation when specifying only one include.
+      //TODO: Fix missing relation when specifying only one include. Ex. /channels?include=schedules (no screens)
       let relations = req.query.include ? model.relations : model.relationships;
 
       _.map(relations, (r, k) => {
@@ -264,9 +265,7 @@ function toJSON(req, res, next) {
   next();
 }
 
-function response(req, res) {
-  //console.log('yus-jsonapi.response', res.jsonapi);
-
+function response(req, res, next) {
   let data = res.jsonapi;
 
   //TODO: set fail codes...
@@ -292,10 +291,12 @@ function response(req, res) {
     success.POST = 200;
   }
 
-  return res
+  res
     .status(success[req.method])
     .set('Content-Type', 'application/vnd.api+json')
     .json(data);
+
+  next();
 }
 
 module.exports.toJSON = toJSON;

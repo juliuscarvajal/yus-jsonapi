@@ -1,0 +1,27 @@
+{
+  "name": "yus-jsonapi",
+  "version": "1.0.0",
+  "description": "JSON API implementation using Bookshelf models",
+  "main": "yus-jsonapi.js",
+  "dependencies": {},
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juliuscarvajal/yus-jsonapi.git"
+  },
+  "keywords": [
+    "jsonapi"
+  ],
+  "author": "Julius Carvajal <juliuscarvajal21@gmail.com>",
+  "license": {
+    "type": "MIT",
+    "url": "https://opensource.org/licenses/MIT"
+  },
+  "bugs": {
+    "url": "https://github.com/juliuscarvajal/yus-jsonapi/issues"
+  },
+  "homepage": "https://github.com/juliuscarvajal/yus-jsonapi#readme"
+}
