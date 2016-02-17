@@ -15,13 +15,13 @@ var _ = require('lodash');
  * @param {[[Type]]} next [[Description]]
  */
 function toJSONAPI(req, res, next) {
-  let model = res.data; //The bookshelf model
+  var model = res.data; //The bookshelf model
 
   if (req.query.raw) {
     res.json(model.toJSON());
   }
 
-  let one2one = ['belongsTo', 'hasOne', 'morphOne'];
+  var one2one = ['belongsTo', 'hasOne', 'morphOne'];
 
   /*
   log.debug('url:', req.baseUrl, req.url, '|', req.originalUrl);
@@ -30,26 +30,26 @@ function toJSONAPI(req, res, next) {
   */
 
   //Bookshelfjs issue: belongsTo does not have the .model object.
-  //let type = data.model ? data.model.type : data.constructor.type;
+  //var type = data.model ? data.model.type : data.constructor.type;
   //log.debug('type:', type);
 
-  let root = req.protocol + '://' + req.get('Host');
-  let url = _.first(req.url.split('?'));
+  var root = req.protocol + '://' + req.get('Host');
+  var url = _.first(req.url.split('?'));
 
-  let jsonapi = {
+  var jsonapi = {
     links: {
       self: root + req.baseUrl + req.url
     },
   };
 
-  let resourceId = function(model) {
+  var resourceId = function(model) {
     return model.id ? {
       type: model.constructor.type + 's', //TODO: temporary fix as Kalpana's angular-jsonapi library is not happy with singular types.  https://github.com/jakubrohleder/angular-jsonapi/issues/28
       id: model.id
     } : null;
   };
 
-  let links = function(relationshipName) {
+  var links = function(relationshipName) {
     return function(model) {
       return {
         self: root + req.baseUrl + '/' + model.constructor.api + '/' + model.id + '/relationships/' + relationshipName,
@@ -58,17 +58,17 @@ function toJSONAPI(req, res, next) {
     };
   };
 
-  let relationships = function(includeLinks) {
+  var relationships = function(includeLinks) {
     return function(model) {
-      let rels = {};
+      var rels = {};
 
       //TODO: Fix missing relation when specifying only one include. Ex. /channels?include=schedules (no screens)
-      let relations = req.query.include ? model.relations : model.relationships;
+      var relations = req.query.include ? model.relations : model.relationships;
 
       _.map(relations, function(r, k) {
-        let related = null;
+        var related = null;
         if (req.query.include) {
-          let relatedModels = r.models || r;
+          var relatedModels = r.models || r;
           related = resourceLinkage(relatedModels);
         }
         else {
@@ -89,7 +89,7 @@ function toJSONAPI(req, res, next) {
           }
 
           //*
-          let isOne2one = _.indexOf(one2one, r.relatedData.type) > -1;
+          var isOne2one = _.indexOf(one2one, r.relatedData.type) > -1;
 
           if (isOne2one && _.size(related) === 1) {
             related = _.first(related);
@@ -108,7 +108,7 @@ function toJSONAPI(req, res, next) {
     };
   };
 
-  let attributes = function() {
+  var attributes = function() {
     return function(model) {
       //return _.omit(model.attributes, 'id');
       return _.omit(model.toJSON({shallow: true}), 'id');
@@ -116,8 +116,8 @@ function toJSONAPI(req, res, next) {
     };
   };
 
-  let data = function(model, attributes, relationships) {
-    let topLevel = null;
+  var data = function(model, attributes, relationships) {
+    var topLevel = null;
     if (!model) {
       return topLevel;
     }
@@ -130,10 +130,10 @@ function toJSONAPI(req, res, next) {
     }
 
     topLevel = _.isArray(topLevel) ? topLevel : [topLevel];
-    let jsondata = _.map(topLevel, function(v, k) {
-      let json = null;
+    var jsondata = _.map(topLevel, function(v, k) {
+      var json = null;
 
-      let resId = resourceId(v);
+      var resId = resourceId(v);
       if (resId) {
         json = resId;
       }
@@ -151,7 +151,7 @@ function toJSONAPI(req, res, next) {
       }
 
       if (relationships) {
-        let rels = relationships(v);
+        var rels = relationships(v);
         if (!_.isEmpty(rels)) {
           json.relationships = rels;
         }
@@ -163,15 +163,15 @@ function toJSONAPI(req, res, next) {
     return jsondata;
   };
 
-  let resourceLinkage = data;
-  let primaryData = data;
+  var resourceLinkage = data;
+  var primaryData = data;
 
-  let d = primaryData(model,
+  var d = primaryData(model,
                attributes(),
                relationships(true));
 
   if (model && model.relatedData) {
-    let isOne2one = _.indexOf(one2one, model.relatedData.type) > -1;
+    var isOne2one = _.indexOf(one2one, model.relatedData.type) > -1;
     if (isOne2one && _.size(d) === 1) {
       d = _.first(d);
     }
@@ -185,7 +185,7 @@ function toJSONAPI(req, res, next) {
     jsonapi.data = d;
   }
 
-  let result = {};
+  var result = {};
 
   function gatherer(model, result) {
     if (!model)
@@ -193,7 +193,7 @@ function toJSONAPI(req, res, next) {
 
     _.map(model.relations, function(r, k) {
       //log.debug('model.relations', r);
-      let relatedModels = r.models;
+      var relatedModels = r.models;
 
       if (_.isEmpty(result[k])) {
         result[k] = [];
@@ -201,7 +201,7 @@ function toJSONAPI(req, res, next) {
 
       if (relatedModels) {
         _.map(relatedModels, function(rm) {
-          let relatedData = data(rm, attributes(), relationships(false));
+          var relatedData = data(rm, attributes(), relationships(false));
           if (relatedData) {
             Array.prototype.push.apply(result[k], relatedData);
           }
@@ -211,7 +211,7 @@ function toJSONAPI(req, res, next) {
       }
       // No related models so just act on the data itself...
       else {
-        let relatedData = data(r, attributes(), relationships(false));
+        var relatedData = data(r, attributes(), relationships(false));
         if (relatedData) {
           Array.prototype.push.apply(result[k], relatedData);
 
@@ -234,7 +234,7 @@ function toJSONAPI(req, res, next) {
     gatherer(model, result);
   }
 
-  let included = [];
+  var included = [];
   _.map(result, (res, k) => {
     res = _.uniq(res, 'id');
     _.map(res, r => {
@@ -266,7 +266,7 @@ function toJSON(req, res, next) {
 }
 
 function response(req, res, next) {
-  let data = res.jsonapi;
+  var data = res.jsonapi;
 
   //TODO: set fail codes...
   if (_.isEmpty(res.jsonapi)) {
@@ -278,7 +278,7 @@ function response(req, res, next) {
     }
   }
 
-  let success = {
+  var success = {
     'GET' : 200,
     'POST' : 201,
     'PATCH' : 200,
