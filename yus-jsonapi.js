@@ -274,7 +274,12 @@ function response(req, res, next) {
       data = res.data;
     }
     else {
-      return res.sendStatus(404); //no data...
+      return next({message: 'No data'});
+    }
+  }
+  else {
+    if (res.data === undefined) {
+      return next({message: 'No data'});
     }
   }
 
