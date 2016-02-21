@@ -45,15 +45,15 @@ function toJSONAPI(req, res, next) {
   var resourceId = function(model) {
     return model.id ? {
       type: model.constructor.type + 's', //TODO: temporary fix as Kalpana's angular-jsonapi library is not happy with singular types.  https://github.com/jakubrohleder/angular-jsonapi/issues/28
-      id: model.id
+      id: model.attributes.id
     } : null;
   };
 
   var links = function(relationshipName) {
     return function(model) {
       return {
-        self: root + req.baseUrl + '/' + model.constructor.api + '/' + model.id + '/relationships/' + relationshipName,
-        related: root + req.baseUrl + '/' + model.constructor.api + '/' + model.id + '/' + relationshipName //TODO: get model from each model.relationship...
+        self: root + req.baseUrl + '/' + model.constructor.api + '/' + model.attributes.id + '/relationships/' + relationshipName,
+        related: root + req.baseUrl + '/' + model.constructor.api + '/' + model.attributes.id + '/' + relationshipName //TODO: get model from each model.relationship...
       };
     };
   };
