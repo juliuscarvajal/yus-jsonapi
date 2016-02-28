@@ -129,8 +129,9 @@ function toJSONAPI(req, res, next) {
       topLevel = model;
     }
 
-    topLevel = _.isArray(topLevel) ? topLevel : [topLevel];
-    var jsondata = _.map(topLevel, function(v, k) {
+    //topLevel = _.isArray(topLevel) ? topLevel : [topLevel];
+
+    function buildData(v, k) {
       var json = null;
 
       var resId = resourceId(v);
@@ -158,7 +159,9 @@ function toJSONAPI(req, res, next) {
       }
 
       return json;
-    });
+    };
+
+    var jsondata = _.isArray(topLevel) ? _.map(topLevel, buildData) : buildData(topLevel);
 
     return jsondata;
   };
