@@ -243,7 +243,7 @@ function toJSONAPI(req, res, next) {
   });
 
   if (!_.isEmpty(included)) {
-    jsonapi.included = included; //result;
+    jsonapi.included = _.uniq(included, i => JSON.stringify(_.pick(i, ['id', 'type'])));
   }
 
   res.jsonapi = jsonapi;
