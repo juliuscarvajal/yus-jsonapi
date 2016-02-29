@@ -205,8 +205,9 @@ function toJSONAPI(req, res, next) {
       if (relatedModels) {
         _.map(relatedModels, function(rm) {
           var relatedData = data(rm, attributes(), relationships(false));
+
           if (relatedData) {
-            Array.prototype.push.apply(result[k], relatedData);
+            Array.prototype.push.apply(result[k], _.isArray(relatedData) ? relatedData : [relatedData]);
           }
 
           gatherer(rm, result);
@@ -215,8 +216,9 @@ function toJSONAPI(req, res, next) {
       // No related models so just act on the data itself...
       else {
         var relatedData = data(r, attributes(), relationships(false));
+
         if (relatedData) {
-          Array.prototype.push.apply(result[k], relatedData);
+          Array.prototype.push.apply(result[k], _.isArray(relatedData) ? relatedData : [relatedData]);
 
           /*
           if (_.size(result[k]) === 1) {
@@ -245,6 +247,7 @@ function toJSONAPI(req, res, next) {
     });
   });
 
+  included = _.filter(included, o => o.id );
   if (!_.isEmpty(included)) {
     jsonapi.included = _.uniq(included, i => JSON.stringify(_.pick(i, ['id', 'type'])));
   }
