@@ -2,13 +2,193 @@
 /* jshint esnext: true */
 
 var _ = require('lodash');
-//import {log} from './logger';
+
+
+var baseUrl = '';
+function setBaseUrl(a) {
+  baseUrl = a;
+}
+function getBaseUrl() {
+  // return 'todo-get-base-url';
+  // return 'http://localhost:3000/api/v0';
+  return baseUrl;
+}
+
+function getResourceIdentifierObjects(models) {
+  return _.map(models, getResourceIdentifierObject);
+}
+
+function getResourceObjects(models) {
+  return _.map(models, getResourceObject);
+}
+
+function getResourceObject(model) {
+  var resourceObject        = getResourceIdentifierObject(model);
+  resourceObject.attributes = getAttributesObject(model);
+  resourceObject.links      = getResourceLinksObject(model)
+  if(hasRelationships(model)) {
+    resourceObject.relationships = getRelationshipsObject(model);
+  }
+  return resourceObject;
+}
+
+function hasRelationships(model)
+{
+  return _.keys(model.relationships).length;
+}
+
+function isRelationshipsEndpoint(req)
+{
+  return _.contains(req.originalUrl, '/relationships/');
+}
+
+
+// http://jsonapi.org/format/#document-resource-identifier-objects
+function getResourceIdentifierObject(model) {
+  return {
+    type: model.constructor.type + 's', //TODO: temporary fix as angular-jsonapi library is not happy with singular types.  https://github.com/jakubrohleder/angular-jsonapi/issues/28
+    id: model.attributes.id
+  }
+};
+
+// http://jsonapi.org/format/#document-resource-object-relationships
+function getRelationshipLinksObject(model, relationshipName)
+{
+  return {
+    self: getBaseUrl() + '/' + model.constructor.api + '/' + model.attributes.id + '/relationships/' + relationshipName,
+    related: getBaseUrl() + '/' + model.constructor.api + '/' + model.attributes.id + '/' + relationshipName //TODO: get model from each model.relationship...
+  };
+}
+
+// http://jsonapi.org/format/#document-resource-objects
+function getResourceLinksObject(model)
+{
+  var links = {
+    collection: getBaseUrl() + '/' + model.constructor.api,
+    self: getBaseUrl() + '/' + model.constructor.api + '/' + model.attributes.id
+  };
+  
+  if(!_.isEmpty(model.links)) 
+  {
+    _.map(model.links, function(getLinkFunction, linkName) {
+      links[linkName] = getLinkFunction(model);
+    });
+  }
+  
+  return links;
+}
+
+function getAttributesObject(model) {
+  return _.omit(model.toJSON({shallow: true}), 'id');
+}
+
+function relationshipIsToOne(relationship)
+{
+  var one2one = ['belongsTo', 'hasOne', 'morphOne'];
+  var isOne2one = _.indexOf(one2one, relationship.relatedData.type) > -1;
+  return isOne2one;
+}
+
+function getRelationshipsObject(model) {
+  var relationshipsObject = {};
+  
+  _.forEach(model.relationships, function(relationship, relationshipName) {
+    
+    relationshipsObject[relationshipName] = {};
+    relationshipsObject[relationshipName]['links'] = getRelationshipLinksObject(model, relationshipName);
+    
+    // all relationships are defined in model.relationships (these are just the functions like return this.hasMany, etc.)
+    // included relationships are defined in model.relations (these are collections, like result sets)
+    if(model.relations[relationshipName])
+    {
+      if(relationshipIsToOne(model.relations[relationshipName]))
+      {
+        relationshipsObject[relationshipName]['data'] = getResourceIdentifierObject(model.relations[relationshipName]);
+      }
+      else
+      {
+        relationshipsObject[relationshipName]['data'] = getResourceIdentifierObjects(model.relations[relationshipName].models);
+      }
+    }
+  });
+  
+  return relationshipsObject;
+};
+
+
+function gatherIncludesForEach(models, includes)
+{
+  _.forEach(models, function(model) {
+    includes = gatherIncludes(model, includes);
+  });
+  
+  return includes;
+}
+
+function gatherIncludes(model, includes)
+{
+  // Get the resource object
+  var resourceObject = getResourceObject(model);
+  
+  // If we've already added it, don't add it (or gather it's includes) again
+  var existing = _.find(includes, function(existingResource){
+    return (existingResource.id == resourceObject.id && existingResource.type == resourceObject.type);
+  });
+  if(existing) return includes; // If this model is already in the includes, skip it.
+  
+  // Otherwise, add it
+  includes.push(resourceObject);
+  
+  // And gather it's includes (note that this is recursive)
+  _.forEach(model.relations, function(relationship, relationshipName){
+    if(relationshipIsToOne(relationship))
+    {
+      includes = gatherIncludes(relationship.model, includes);
+    }
+    else
+    {
+      gatherIncludesForEach(relationship.models, includes);
+    }
+  });
+  
+  return includes;
+}
+
+function omitPrimaryFromIncludes(primaryData, includes)
+{
+  var newIncludes = [];
+  
+  if(!_.isArray(primaryData)) primaryData = [primaryData];
+  
+  _.forEach(includes, function(includedResource, index){
+    
+    var existing = _.find(primaryData, function(primaryDataResource){
+      return (primaryDataResource.id == includedResource.id && primaryDataResource.type == includedResource.type);
+    });
+    if(!existing) newIncludes.push(includedResource);
+    
+  });
+  
+  return newIncludes;
+}
+
+
+
+
+
+
+
+
+
+
+
 
 /**
- * JSONAPIfy a bookshelf model.
+ * JSONAPIify a bookshelf model.
  * Requires:
- * Model.type (Defined on each model)
- * res.data (Bookshelf model)
+ * 
+ * - Model.type (Defined on each model)
+ * - res.data (Bookshelf model)
  *
  * @param {[[Type]]} req  [[Description]]
  * @param {[[Type]]} res  [[Description]]
@@ -16,245 +196,76 @@ var _ = require('lodash');
  */
 function toJSONAPI(req, res, next) {
   var model = res.data; //The bookshelf model
-
+  setBaseUrl(req.protocol + '://' + req.get('Host') + req.baseUrl); // todo: rm this hax
+  
+  // putting ?raw=true will cause the response w/o any toJSONAPIifying happening
   if (req.query.raw) {
     res.json(model.toJSON());
   }
-
-  var one2one = ['belongsTo', 'hasOne', 'morphOne'];
-
+  
+  // Primary Data object
   /*
-  log.debug('url:', req.baseUrl, req.url, '|', req.originalUrl);
-  log.debug('query:', req.query);
-  log.debug('relationship:', req.relationship);
-  */
-
-  //Bookshelfjs issue: belongsTo does not have the .model object.
-  //var type = data.model ? data.model.type : data.constructor.type;
-  //log.debug('type:', type);
-
-  var root = req.protocol + '://' + req.get('Host');
-  var url = _.first(req.url.split('?'));
-
-  var jsonapi = {
-    links: {
-      self: root + req.baseUrl + req.url
-    },
-  };
-
-  var resourceId = function(model) {
-    return model.id ? {
-      type: model.constructor.type + 's', //TODO: temporary fix as Kalpana's angular-jsonapi library is not happy with singular types.  https://github.com/jakubrohleder/angular-jsonapi/issues/28
-      id: model.attributes.id
-    } : null;
-  };
-
-  var links = function(relationshipName) {
-    return function(model) {
-      return {
-        self: root + req.baseUrl + '/' + model.constructor.api + '/' + model.attributes.id + '/relationships/' + relationshipName,
-        related: root + req.baseUrl + '/' + model.constructor.api + '/' + model.attributes.id + '/' + relationshipName //TODO: get model from each model.relationship...
-      };
-    };
-  };
-
-  var relationships = function(includeLinks) {
-    return function(model) {
-      var rels = {};
-
-      //TODO: Fix missing relation when specifying only one include. Ex. /channels?include=schedules (no screens)
-      var relations = req.query.include ? model.relations : model.relationships;
-
-      _.map(relations, function(r, k) {
-        var related = null;
-        if (req.query.include) {
-          var relatedModels = r.models || r;
-          related = resourceLinkage(relatedModels);
-        }
-        else {
-          rels[k] = {}; // all relationships...
-        }
-
-        if (includeLinks) {
-          if (_.isEmpty(rels[k])) {
-            rels[k] = {};
-          }
-
-          rels[k].links = links(k)(model);
-        }
-
-        if (!_.isEmpty(related)) {
-          if (_.isEmpty(rels[k])) {
-            rels[k] = {};
-          }
-
-          //*
-          var isOne2one = _.indexOf(one2one, r.relatedData.type) > -1;
-
-          if (isOne2one && _.size(related) === 1) {
-            related = _.first(related);
-          }
-          //*/
-
-          rels[k].data = related;
-        }
-      });
-
-      if (_.isEmpty(rels)) {
-        rels = null;
-      }
-
-      return rels;
-    };
-  };
-
-  var attributes = function() {
-    return function(model) {
-      //return _.omit(model.attributes, 'id');
-      return _.omit(model.toJSON({shallow: true}), 'id');
-      //return model.toJSON();
-    };
-  };
-
-  var data = function(model, attributes, relationships) {
-    var topLevel = null;
-    if (!model) {
-      return topLevel;
+   * http://jsonapi.org/format/#document-top-level
+   * Primary data MUST be either:
+   * 
+   * - a single resource object, a single resource identifier object, or null, for requests that target single resources
+   * - an array of resource objects, an array of resource identifier objects, or an empty array ([]), for requests that target resource collections
+   */
+  var primaryData = null;
+  var includes = [];
+  if(model.models) // There's multiple resources in the result listing. eg /channels, /channels/4/schedules, /channels/4/relationships/schedules
+  {
+    if(isRelationshipsEndpoint(req))
+    {
+      primaryData = getResourceIdentifierObjects(model.models);
     }
-
-    if (model.model) {
-      topLevel = model.models;
-    }
-    else {
-      topLevel = model;
-    }
-
-    //topLevel = _.isArray(topLevel) ? topLevel : [topLevel];
-
-    function buildData(v, k) {
-      var json = null;
-
-      var resId = resourceId(v);
-      if (resId) {
-        json = resId;
-      }
-      else {
-        json = {};
-      }
-
-      // if relationships url then just return the resource ids...
-      if (_.contains(req.originalUrl, '/relationships/')) {
-        return json;
-      }
-
-      if (attributes) {
-        json.attributes = attributes(v);
-      }
-
-      if (relationships) {
-        var rels = relationships(v);
-        if (!_.isEmpty(rels)) {
-          json.relationships = rels;
-        }
-      }
-
-      return json;
-    };
-
-    var jsondata = _.isArray(topLevel) ? _.map(topLevel, buildData) : buildData(topLevel);
-
-    return jsondata;
-  };
-
-  var resourceLinkage = data;
-  var primaryData = data;
-
-  var d = primaryData(model,
-               attributes(),
-               relationships(true));
-
-  if (model && model.relatedData) {
-    var isOne2one = _.indexOf(one2one, model.relatedData.type) > -1;
-    if (isOne2one && _.size(d) === 1) {
-      d = _.first(d);
+    else
+    {
+      primaryData = getResourceObjects(model.models);
+      includes = gatherIncludesForEach(model.models, includes);
     }
   }
-
-  if (['POST', 'PATCH', 'PUT'].indexOf(req.method) > -1 && _.size(d) === 1) {
-    d = _.first(d);
+  else // there's only one resource in the result listing. eg /channels/4, /locations/5/timezone, channels/4?include=schedules
+  {
+    if(isRelationshipsEndpoint(req))
+    {
+      primaryData = getResourceIdentifierObject(model);
+    }
+    else
+    {
+      primaryData = getResourceObject(model);
+      includes = gatherIncludes(model, includes);
+    }
   }
-
-  if (d) {
-    jsonapi.data = d;
+  
+  includes = omitPrimaryFromIncludes(primaryData, includes);
+  
+  // Top-level document
+  // http://jsonapi.org/format/#document-top-level
+  var topLevelDocument = {};
+  topLevelDocument.data = primaryData;
+  if(req.query.include) {
+    topLevelDocument.included = includes;
   }
-
-  var result = {};
-
-  function gatherer(model, result) {
-    if (!model)
-      return null;
-
-    _.map(model.relations, function(r, k) {
-      //log.debug('model.relations', r);
-      var relatedModels = r.models;
-
-      if (_.isEmpty(result[k])) {
-        result[k] = [];
-      }
-
-      if (relatedModels) {
-        _.map(relatedModels, function(rm) {
-          var relatedData = data(rm, attributes(), relationships(false));
-
-          if (relatedData) {
-            Array.prototype.push.apply(result[k], _.isArray(relatedData) ? relatedData : [relatedData]);
-          }
-
-          gatherer(rm, result);
-        });
-      }
-      // No related models so just act on the data itself...
-      else {
-        var relatedData = data(r, attributes(), relationships(false));
-
-        if (relatedData) {
-          Array.prototype.push.apply(result[k], _.isArray(relatedData) ? relatedData : [relatedData]);
-
-          /*
-          if (_.size(result[k]) === 1) {
-            result[k] = relatedData;
-          }
-          */
-        }
-      }
-    });
-  }
-
-  if (model && model.models) {
-    _.map(model.models, m => {
-      gatherer(m, result);
-    });
-  }
-  else {
-    gatherer(model, result);
-  }
-
-  var included = [];
-  _.map(result, (res, k) => {
-    res = _.uniq(res, 'id');
-    _.map(res, r => {
-      included.push(r);
-    });
-  });
-
-  included = _.filter(included, o => o.id );
-  if (!_.isEmpty(included)) {
-    jsonapi.included = _.uniq(included, i => JSON.stringify(_.pick(i, ['id', 'type'])));
-  }
-
-  res.jsonapi = jsonapi;
+  topLevelDocument.links = {self: getBaseUrl() + req.url};
+  
+  
+  // Modify Response object & call next function
+  res.jsonapi = topLevelDocument;
   next();
 }
+
+
+
+
+
+
+
+
+
+
+
+
 
 function toJSON(req, res, next) {
   //log.debug('post.body', req.body);
@@ -270,6 +281,23 @@ function toJSON(req, res, next) {
 
   next();
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 function response(req, res, next) {
   var data = res.jsonapi;
@@ -309,6 +337,22 @@ function response(req, res, next) {
 
   next();
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 module.exports.toJSON = toJSON;
 module.exports.toJSONAPI = toJSONAPI;
